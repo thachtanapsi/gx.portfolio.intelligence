@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gx_portfolio_intelligence
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - gx_pi_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gx_portfolio_intelligence"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gx-pi:
+    profiles: ["service"]
+    build:
+      context: ..
+      dockerfile: gx.portfolio.intelligence/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      simple-rag:
+        condition: service_healthy
+    ports:
+      - "4010:4010"
+    volumes:
+      - gx_pi_artifacts:/data/gx-pi/artifacts
+    restart: unless-stopped
+
+  simple-rag:
+    profiles: ["service"]
+    build:
+      context: ../SimpleRAGChatBot
+      dockerfile: Dockerfile
+    environment:
+      RAG_BASE_DIR: /app
+      RAG_DATA_DIR: /data
+      RAG_PAPERS_DIR: /app/papers
+      RAG_SERVICE_API_KEY: ${RAG_SERVICE_API_KEY:-}
+      RAG_OLLAMA_BASE_URL: ${SIMPLE_RAG_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      RAG_CHAT_MODEL: ${RAG_CHAT_MODEL:-gemma4:e2b}
+      RAG_ANSWER_NUM_PREDICT: ${RAG_ANSWER_NUM_PREDICT:-2048}
+      RAG_REWRITE_NUM_PREDICT: ${RAG_REWRITE_NUM_PREDICT:-96}
+      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-BAAI/bge-m3}
+      RAG_EMBED_DEVICE: cpu
+      HF_HOME: /models/huggingface
+      SENTENCE_TRANSFORMERS_HOME: /models/huggingface
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      LANGSMITH_TRACING: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - simple_rag_data:/data
+      - simple_rag_models:/models
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    init: true
+    restart: unless-stopped
+
+volumes:
+  gx_pi_postgres:
+  gx_pi_artifacts:
+  simple_rag_data:
+  simple_rag_models:
