@@ -93,6 +93,8 @@ VN_MEDIA_ARCHIVE_ENCRYPTION_KEY=<Fernet key khác>
 
 RAG_SERVICE_URL=http://simple-rag:8000
 RAG_SERVICE_API_KEY=<shared token mới>
+RAG_ANSWER_NUM_PREDICT=2048
+RAG_ADVANCED_ANSWER_NUM_PREDICT=1024
 
 GX_PI_CRON_ENABLED=false
 GX_PI_WEBHOOK_URL=<optional webhook URL>
@@ -328,7 +330,8 @@ cd /Users/thachtan/Documents/source/APG/gx.portfolio.intelligence
 docker compose --profile service build simple-rag gx-pi
 
 docker compose --profile service up -d --force-recreate simple-rag
-curl --fail --silent http://127.0.0.1:8000/api/health | jq
+curl --fail --silent http://127.0.0.1:8000/api/health \
+  | jq -e '.status == "ok" and .advanced.answer_num_predict == 1024'
 ```
 
 Khi SimpleRAG mới đã healthy và trước khi nâng `gx-pi`, kiểm tra **từng ngày
